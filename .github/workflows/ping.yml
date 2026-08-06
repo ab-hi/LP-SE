@@ -1,0 +1,33 @@
+name: Ping Render backend
+
+# Runs every 10 minutes, forever, independent of whether anyone is using
+# the app right now. Render puts free web services to sleep after 15
+# minutes with no traffic - this keeps that from ever happening by making
+# sure it never goes more than 10 minutes without a request.
+#
+# This has to live in its own always-active repo rather than in the
+# backend or frontend project themselves: a sleeping Render process can't
+# wake itself up (nothing inside it is running), and a ping triggered by
+# the frontend only fires while someone has the app open - which, given
+# low traffic, is most of the time NOT the case.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {} # lets you trigger it manually from the Actions tab to test
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        # --max-time 70: generous enough that if this run is the one that
+        # actually wakes a sleeping instance (shouldn't normally happen if
+        # the schedule is doing its job, but just in case one run is
+        # missed), curl waits long enough for Render's cold start rather
+        # than timing out and reporting a false failure.
+        # || true: a single transient failure (network blip, Render
+        # mid-deploy, etc.) shouldn't spam failure-notification emails for
+        # a job that will just try again in 10 minutes anyway.
+        run: |
+          curl -sS --max-time 70 "${{ vars.RENDER_HEALTH_URL }}" || true

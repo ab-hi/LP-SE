@@ -1,0 +1,33 @@
+name: Keep repo active
+
+# GitHub automatically disables scheduled workflows after 60 days with no
+# repository activity (a real risk here, since this repo's only purpose
+# is running a scheduled ping - nothing else ever happens in it). This
+# workflow exists purely to create that activity: once a month it updates
+# a timestamp file and commits it, which resets GitHub's inactivity clock
+# well before the 60-day cutoff. Runs far more often than strictly needed
+# as a safety margin against occasional missed/delayed runs.
+
+on:
+  schedule:
+    - cron: '0 3 1 * *' # 03:00 UTC on the 1st of every month
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  touch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update heartbeat file and commit
+        run: |
+          mkdir -p .github
+          date -u +"Last touched: %Y-%m-%dT%H:%M:%SZ UTC" > .github/keepalive-heartbeat.txt
+          git config user.name "keepalive-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/keepalive-heartbeat.txt
+          git commit -m "chore: keepalive heartbeat" || echo "Nothing to commit"
+          git push
